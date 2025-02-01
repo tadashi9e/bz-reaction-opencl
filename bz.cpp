@@ -507,29 +507,7 @@ int main(int argc, char *argv[]) {
     elements_size = std::vector<cl_int>({
         field_width, field_height});  // cell slots
     local_work_size = std::vector<cl_int>({
-        32, 32});
-    global_work_size = std::vector<cl_int>({
-        static_cast<cl_int>(ceil(
-            static_cast<double>(elements_size[0])
-            / local_work_size[0]) * local_work_size[0]),
-        static_cast<cl_int>(ceil(
-            static_cast<double>(elements_size[1])
-            / local_work_size[1]) * local_work_size[1])});
-    std::cout << "global_work_size[0]=" << global_work_size[0]
-              << ", local_work_size[0]=" << local_work_size[0]
-              << ", elements_size[0]=" << elements_size[0]
-              << ", work_groups_x="
-              << (global_work_size[0] / local_work_size[0])
-              << std::endl;
-    std::cout << "global_work_size[1]=" << global_work_size[1]
-              << ", local_work_size[1]=" << local_work_size[1]
-              << ", elements_size[1]=" << elements_size[1]
-              << ", work_groups_y="
-              << (global_work_size[1] / local_work_size[1])
-              << std::endl;
-    /* allocate host memory */
-    field_image.resize(global_work_size[0] * global_work_size[1] * 4);
-    /* end allocate host memory */
+        256, 256});
 
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
@@ -551,6 +529,19 @@ int main(int argc, char *argv[]) {
         std::cout << "device: vendor[" << devvendor << "]"
           ",name[" << devname << "]"
           ",version[" << devver << "]" << std::endl;
+        size_t max_work_group_size;
+        device.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE,
+                       &max_work_group_size);
+        std::cout << "        MAX_WORK_GROUP_SIZE="
+                  << max_work_group_size << std::endl;
+        while (static_cast<size_t>(local_work_size[0] *
+                                   local_work_size[1]) > max_work_group_size) {
+          local_work_size[0] /= 2;
+          if (static_cast<size_t>(local_work_size[0] *
+                                  local_work_size[1]) > max_work_group_size) {
+            local_work_size[1] /= 2;
+          }
+        }
         break;
       }
     }
@@ -577,6 +568,29 @@ int main(int argc, char *argv[]) {
 
     context = cl::Context(device, properties);
     command_queue = cl::CommandQueue(context, device, 0);
+
+    global_work_size = std::vector<cl_int>({
+        static_cast<cl_int>(ceil(
+            static_cast<double>(elements_size[0])
+            / local_work_size[0]) * local_work_size[0]),
+        static_cast<cl_int>(ceil(
+            static_cast<double>(elements_size[1])
+            / local_work_size[1]) * local_work_size[1])});
+    std::cout << "global_work_size[0]=" << global_work_size[0]
+              << ", local_work_size[0]=" << local_work_size[0]
+              << ", elements_size[0]=" << elements_size[0]
+              << ", work_groups_x="
+              << (global_work_size[0] / local_work_size[0])
+              << std::endl;
+    std::cout << "global_work_size[1]=" << global_work_size[1]
+              << ", local_work_size[1]=" << local_work_size[1]
+              << ", elements_size[1]=" << elements_size[1]
+              << ", work_groups_y="
+              << (global_work_size[1] / local_work_size[1])
+              << std::endl;
+    /* allocate host memory */
+    field_image.resize(global_work_size[0] * global_work_size[1] * 4);
+    /* end allocate host memory */
 
     /* create buffers */
     cl::ImageGL image(context, CL_MEM_WRITE_ONLY, GL_TEXTURE_2D,
@@ -624,9 +638,7 @@ int main(int argc, char *argv[]) {
       bz_kernel_diffusion_a = cl::Kernel(program, "bz_diffusion");
       bz_kernel_diffusion_a.setArg(0, dev_field_a);
       bz_kernel_diffusion_a.setArg(1, dev_field_a2);
-      bz_kernel_diffusion_a.setArg(2, sizeof(cl_int), &elements_size[0]);
-      bz_kernel_diffusion_a.setArg(3, sizeof(cl_int), &elements_size[1]);
-      bz_kernel_diffusion_a.setArg(4, sizeof(cl_float), &diffusion_rate);
+      bz_kernel_diffusion_a.setArg(2, sizeof(cl_float), &diffusion_rate);
     } catch (...) {
       std::cerr << "bz_diffusion_a" << std::endl;
       throw;
@@ -635,9 +647,7 @@ int main(int argc, char *argv[]) {
       bz_kernel_diffusion_b = cl::Kernel(program, "bz_diffusion");
       bz_kernel_diffusion_b.setArg(0, dev_field_b);
       bz_kernel_diffusion_b.setArg(1, dev_field_b2);
-      bz_kernel_diffusion_b.setArg(2, sizeof(cl_int), &elements_size[0]);
-      bz_kernel_diffusion_b.setArg(3, sizeof(cl_int), &elements_size[1]);
-      bz_kernel_diffusion_b.setArg(4, sizeof(cl_float), &diffusion_rate);
+      bz_kernel_diffusion_b.setArg(2, sizeof(cl_float), &diffusion_rate);
     } catch (...) {
       std::cerr << "bz_diffusion_b" << std::endl;
       throw;
@@ -646,9 +656,7 @@ int main(int argc, char *argv[]) {
       bz_kernel_diffusion_c = cl::Kernel(program, "bz_diffusion");
       bz_kernel_diffusion_c.setArg(0, dev_field_c);
       bz_kernel_diffusion_c.setArg(1, dev_field_c2);
-      bz_kernel_diffusion_c.setArg(2, sizeof(cl_int), &elements_size[0]);
-      bz_kernel_diffusion_c.setArg(3, sizeof(cl_int), &elements_size[1]);
-      bz_kernel_diffusion_c.setArg(4, sizeof(cl_float), &diffusion_rate);
+      bz_kernel_diffusion_c.setArg(2, sizeof(cl_float), &diffusion_rate);
     } catch (...) {
       std::cerr << "bz_diffusion_c" << std::endl;
       throw;
@@ -662,11 +670,9 @@ int main(int argc, char *argv[]) {
       bz_kernel_reaction.setArg(3, dev_field_a);
       bz_kernel_reaction.setArg(4, dev_field_b);
       bz_kernel_reaction.setArg(5, dev_field_c);
-      bz_kernel_reaction.setArg(6, sizeof(cl_int), &elements_size[0]);
-      bz_kernel_reaction.setArg(7, sizeof(cl_int), &elements_size[1]);
-      bz_kernel_reaction.setArg(8, sizeof(cl_float), &param_a);
-      bz_kernel_reaction.setArg(9, sizeof(cl_float), &param_b);
-      bz_kernel_reaction.setArg(10, sizeof(cl_float), &param_c);
+      bz_kernel_reaction.setArg(6, sizeof(cl_float), &param_a);
+      bz_kernel_reaction.setArg(7, sizeof(cl_float), &param_b);
+      bz_kernel_reaction.setArg(8, sizeof(cl_float), &param_c);
     } catch (...) {
       std::cerr << "bz_reaction" << std::endl;
       throw;
@@ -678,8 +684,6 @@ int main(int argc, char *argv[]) {
       bz_kernel_draw_image.setArg(1, dev_field_b);
       bz_kernel_draw_image.setArg(2, dev_field_c);
       bz_kernel_draw_image.setArg(3, dev_image);
-      bz_kernel_draw_image.setArg(4, sizeof(cl_int), &elements_size[0]);
-      bz_kernel_draw_image.setArg(5, sizeof(cl_int), &elements_size[1]);
     } catch (...) {
       std::cerr << "bz_draw_image" << std::endl;
       throw;

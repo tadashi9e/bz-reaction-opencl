@@ -42,9 +42,9 @@ inline float average(
 __kernel void bz_diffusion(
     __global float *src,
     __global float *dst,
-    int width,
-    int height,
     float rate) {
+  const int width = get_global_size(0);
+  const int height = get_global_size(0);
   const int x = get_global_id(0);
   const int y = get_global_id(1);
   if (x >= width || y >= height) return;
@@ -72,11 +72,11 @@ __kernel void bz_reaction(
     __global float *a2,
     __global float *b2,
     __global float *c2,
-    int width,
-    int height,
     float param_a,
     float param_b,
     float param_c) {
+  const int width = get_global_size(0);
+  const int height = get_global_size(0);
   const int x = get_global_id(0);
   const int y = get_global_id(1);
   if (x >= width || y >= height) return;
@@ -96,9 +96,9 @@ __kernel void bz_draw_image(
     __global float *a,
     __global float *b,
     __global float *c,
-    __write_only image2d_t image,
-    int width,
-    int height) {
+    __write_only image2d_t image) {
+  const int width = get_global_size(0);
+  const int height = get_global_size(0);
   const int x = get_global_id(0);
   const int y = get_global_id(1);
   if (x >= width || y >= height) return;
