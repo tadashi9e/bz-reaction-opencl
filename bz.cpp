@@ -529,6 +529,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
+    bool device_found = false;
     size_t dev_index = 0;
     for (cl::Platform plat : platforms) {
       const std::string platvendor = plat.getInfo<CL_PLATFORM_VENDOR>();
@@ -557,6 +558,7 @@ int main(int argc, char *argv[]) {
         if (dev_index == device_index) {
           platform = plat;
           device = dev;
+          device_found = true;
           while (static_cast<size_t>(
               local_work_size[0] *
               local_work_size[1]) > max_work_group_size) {
@@ -570,6 +572,10 @@ int main(int argc, char *argv[]) {
         }
         ++dev_index;
       }
+    }
+    if (!device_found) {
+      std::cerr << "device[" << device_index << "] not found" << std::endl;
+      exit(1);
     }
     const cl_platform_id platform_id = device.getInfo<CL_DEVICE_PLATFORM>()();
     cl_context_properties properties[7];
