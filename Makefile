@@ -1,9 +1,10 @@
-CXX_FLAGS=-Wall -D__CL_ENABLE_EXCEPTIONS -DCL_HPP_TARGET_OPENCL_VERSION=220
+CXXFLAGS=-g -Wall `pkg-config --cflags OpenCL glut glu gl`
+LDFLAGS=`pkg-config --libs OpenCL glut glu gl`
 
 all: bz
 
 bz: bz.cpp
-	g++ $(CXX_FLAGS) bz.cpp -o bz -g -lglut -lGLEW -lGLU -lGL `pkg-config --libs --cflags OpenCL`
+	g++ $(CXXFLAGS) bz.cpp -o bz $(LDFLAGS)
 
 clean:
 	rm -rf bz

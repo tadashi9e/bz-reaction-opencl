@@ -9,6 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#define CL_HPP_TARGET_OPENCL_VERSION 220
 #define CL_HPP_ENABLE_EXCEPTIONS
 #include <CL/opencl.hpp>
 #include <GL/freeglut.h>
@@ -443,9 +444,8 @@ inline void rtrim(std::string &s) {
 }
 
 int main(int argc, char *argv[]) {
-  cl_int err;
-  size_t device_index = 0;
   try {
+    size_t device_index = 0;
     for (;;) {
       int option_index = 0;
       static struct option long_options[] = {
@@ -507,16 +507,21 @@ int main(int argc, char *argv[]) {
         break;
       default:
         std::cerr << "Usage: " << argv[0] <<
+          " [--device N]"
           " [-w width]"
           " [-h height]"
           " [-i interval_millis]"
           " [-d diffusion_rate]"
           " [-P]" << std::endl;
-        std::cerr << " -w : Field width." << std::endl;
-        std::cerr << " -h : Field height." << std::endl;
-        std::cerr << " -i : Step interval in milli seconds." << std::endl;
-        std::cerr << " -d : diffusion rate (0.0 ~ 1.0)." << std::endl;
-        std::cerr << " -P : Pause at start. Will be released by 'p' key."
+        std::cerr << " -d, --device    : Select compute device." << std::endl;
+        std::cerr << " -w, --width     : Field width." << std::endl;
+        std::cerr << " -h, --height    : Field height." << std::endl;
+        std::cerr << " -i, --interval  : Step interval in milli seconds." << std::endl;
+        std::cerr << " -d, --diffusion : Diffusion rate (0.0 ~ 1.0)." << std::endl;
+        std::cerr << " -a              : Parameter a." << std::endl;
+        std::cerr << " -b              : Parameter b." << std::endl;
+        std::cerr << " -c              : Parameter c." << std::endl;
+        std::cerr << " -P, --pause     : Pause at start. Will be released by 'p' key."
                   << std::endl;
         exit(1);
       }
@@ -531,7 +536,7 @@ int main(int argc, char *argv[]) {
     cl::Platform::get(&platforms);
     bool device_found = false;
     size_t dev_index = 0;
-    for (cl::Platform plat : platforms) {
+    for (cl::Platform& plat : platforms) {
       const std::string platvendor = plat.getInfo<CL_PLATFORM_VENDOR>();
       const std::string platname = plat.getInfo<CL_PLATFORM_NAME>();
       const std::string platver = plat.getInfo<CL_PLATFORM_VERSION>();
@@ -540,7 +545,7 @@ int main(int argc, char *argv[]) {
         ",version[" << platver << "]" << std::endl;
       std::vector<cl::Device> devices;
       plat.getDevices(CL_DEVICE_TYPE_GPU, &devices);
-      for (cl::Device dev : devices) {
+      for (cl::Device& dev : devices) {
         const std::string devvendor = dev.getInfo<CL_DEVICE_VENDOR>();
         const std::string devname = dev.getInfo<CL_DEVICE_NAME>();
         const std::string devver = dev.getInfo<CL_DEVICE_VERSION>();
@@ -625,9 +630,8 @@ int main(int argc, char *argv[]) {
     /* end allocate host memory */
 
     /* create buffers */
-    cl::ImageGL image(context, CL_MEM_WRITE_ONLY, GL_TEXTURE_2D,
-                      0, rendered_texture, &err);
-    dev_image = image();
+    dev_image = cl::ImageGL(
+        context, CL_MEM_WRITE_ONLY, GL_TEXTURE_2D, 0, rendered_texture);
     dev_field_a = cl::Buffer(
         context, CL_MEM_READ_WRITE,
         sizeof(cl_float) * global_work_size[0] * global_work_size[1]);
