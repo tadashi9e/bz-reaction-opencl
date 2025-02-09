@@ -443,17 +443,28 @@ inline void rtrim(std::string &s) {
     }).base(), s.end());
 }
 
+bool with_cl_gl_sharing(const std::string& extensions) {
+  std::stringstream ex_ss(extensions);
+  std::string ex_item;
+  while (std::getline(ex_ss, ex_item, ' ')) {
+    if (ex_item == "cl_khr_gl_sharing") {
+      return true;
+    }
+  }
+  return false;
+}
+
 int main(int argc, char *argv[]) {
   try {
     size_t device_index = 0;
     for (;;) {
       int option_index = 0;
       static struct option long_options[] = {
-        {"device", required_argument, 0, 0},
+        {"device", required_argument, 0, 'd'},
         {"width", required_argument, 0, 'w'},
         {"height", required_argument, 0, 'h'},
         {"interval", required_argument, 0, 'i'},
-        {"diffusion", required_argument, 0, 'd'},
+        {"diffusion", required_argument, 0, 'D'},
         {"pause", no_argument, 0, 'P'},
         {0, 0, 0}};
       int c = getopt_long(argc, argv, "w:h:n:i:d:a:b:c:P",
@@ -462,11 +473,8 @@ int main(int argc, char *argv[]) {
         break;
       }
       switch (c) {
-      case 0:
-        if (std::string(long_options[option_index].name) ==
-            "device") {
-          device_index = atoi(optarg);
-        }
+      case 'd':
+        device_index = atoi(optarg);
         break;
       case 'w':
         {
@@ -485,7 +493,7 @@ int main(int argc, char *argv[]) {
       case 'i':
         gen_mills = atoi(optarg);
         break;
-      case 'd':
+      case 'D':
         diffusion_rate = atof(optarg);
         if (diffusion_rate < 0.0 ||
             diffusion_rate > 1.0) {
@@ -511,13 +519,13 @@ int main(int argc, char *argv[]) {
           " [-w width]"
           " [-h height]"
           " [-i interval_millis]"
-          " [-d diffusion_rate]"
+          " [-D diffusion_rate]"
           " [-P]" << std::endl;
         std::cerr << " -d, --device    : Select compute device." << std::endl;
         std::cerr << " -w, --width     : Field width." << std::endl;
         std::cerr << " -h, --height    : Field height." << std::endl;
         std::cerr << " -i, --interval  : Step interval in milli seconds." << std::endl;
-        std::cerr << " -d, --diffusion : Diffusion rate (0.0 ~ 1.0)." << std::endl;
+        std::cerr << " -D, --diffusion : Diffusion rate (0.0 ~ 1.0)." << std::endl;
         std::cerr << " -a              : Parameter a." << std::endl;
         std::cerr << " -b              : Parameter b." << std::endl;
         std::cerr << " -c              : Parameter c." << std::endl;
@@ -537,45 +545,46 @@ int main(int argc, char *argv[]) {
     bool device_found = false;
     size_t dev_index = 0;
     for (cl::Platform& plat : platforms) {
-      const std::string platvendor = plat.getInfo<CL_PLATFORM_VENDOR>();
-      const std::string platname = plat.getInfo<CL_PLATFORM_NAME>();
-      const std::string platver = plat.getInfo<CL_PLATFORM_VERSION>();
-      std::cout << "platform: vendor[" << platvendor << "]"
-        ",name[" << platname << "]"
-        ",version[" << platver << "]" << std::endl;
-      std::vector<cl::Device> devices;
-      plat.getDevices(CL_DEVICE_TYPE_GPU, &devices);
-      for (cl::Device& dev : devices) {
-        const std::string devvendor = dev.getInfo<CL_DEVICE_VENDOR>();
-        const std::string devname = dev.getInfo<CL_DEVICE_NAME>();
-        const std::string devver = dev.getInfo<CL_DEVICE_VERSION>();
-        std::cout <<
-          ((dev_index == device_index) ? '*' : ' ') <<
-          "device[" << dev_index << "]:"
-          " vendor[" << devvendor << "]"
-          ",name[" << devname << "]"
-          ",version[" << devver << "]" << std::endl;
-        size_t max_work_group_size;
-        dev.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE,
-                    &max_work_group_size);
-        std::cout << "        MAX_WORK_GROUP_SIZE="
-                  << max_work_group_size << std::endl;
-        if (dev_index == device_index) {
-          platform = plat;
-          device = dev;
-          device_found = true;
-          while (static_cast<size_t>(
-              local_work_size[0] *
-              local_work_size[1]) > max_work_group_size) {
-            local_work_size[0] /= 2;
-            if (static_cast<size_t>(
+      for (cl_device_type device_type
+             : {CL_DEVICE_TYPE_CPU, CL_DEVICE_TYPE_GPU}) {
+        std::vector<cl::Device> devices;
+        plat.getDevices(device_type, &devices);
+        for (cl::Device& dev : devices) {
+          const std::string extensions = dev.getInfo<CL_DEVICE_EXTENSIONS>();
+          if (!with_cl_gl_sharing(extensions)) {
+            continue;
+          }
+          const std::string devvendor = dev.getInfo<CL_DEVICE_VENDOR>();
+          const std::string devname = dev.getInfo<CL_DEVICE_NAME>();
+          const std::string devver = dev.getInfo<CL_DEVICE_VERSION>();
+          std::cout <<
+            ((dev_index == device_index) ? '*' : ' ') <<
+            "device[" << dev_index << "]:"
+            " vendor[" << devvendor << "]"
+            ",name[" << devname << "]"
+            ",version[" << devver << "]" << std::endl;
+          size_t max_work_group_size;
+          dev.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE,
+                      &max_work_group_size);
+          std::cout << "        MAX_WORK_GROUP_SIZE="
+                    << max_work_group_size << std::endl;
+          if (dev_index == device_index) {
+            platform = plat;
+            device = dev;
+            device_found = true;
+            while (static_cast<size_t>(
                 local_work_size[0] *
                 local_work_size[1]) > max_work_group_size) {
-              local_work_size[1] /= 2;
+              local_work_size[0] /= 2;
+              if (static_cast<size_t>(
+                  local_work_size[0] *
+                  local_work_size[1]) > max_work_group_size) {
+                local_work_size[1] /= 2;
+              }
             }
           }
+          ++dev_index;
         }
-        ++dev_index;
       }
     }
     if (!device_found) {

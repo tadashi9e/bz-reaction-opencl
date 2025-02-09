@@ -17,12 +17,12 @@ A Belousov–Zhabotinsky reaction, or BZ reaction, is one of a class of reaction
 ## Usage
 
 ```
-Usage: ./bz [--device N] [-w width] [-h height] [-i interval_millis] [-d diffusion_rate] [-P]
+Usage: bz [--device N] [-w width] [-h height] [-i interval_millis] [-D diffusion_rate] [-P]
  -d, --device    : Select compute device.
  -w, --width     : Field width.
  -h, --height    : Field height.
  -i, --interval  : Step interval in milli seconds.
- -d, --diffusion : Diffusion rate (0.0 ~ 1.0).
+ -D, --diffusion : Diffusion rate (0.0 ~ 1.0).
  -a              : Parameter a.
  -b              : Parameter b.
  -c              : Parameter c.
